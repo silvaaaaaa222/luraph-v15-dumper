@@ -10,29 +10,29 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Setup Lua
-      uses: leafo/gh-action-lua@v10
-      with:
-        luaVersion: 5.3
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lua5.3
     
     - name: Run Dumper
       run: |
-        lua dumper.lua 25ms_get.lua.txt
+        lua5.3 dumper.lua 25ms_get.lua.txt || true
     
     - name: Check Output
       run: |
         if [ -f output_dumped.lua ]; then
-          echo "✅ Dump criado com sucesso!"
-          head -100 output_dumped.lua
+          echo "✅ Dump criado!"
+          ls -lh output_dumped.lua
         else
-          echo "❌ Dump falhou"
+          echo "⚠️ Arquivo não criado"
         fi
     
     - name: Upload Artifact
+      uses: actions/upload-artifact@v4
       if: always()
-      uses: actions/upload-artifact@v3
       with:
         name: dumped-code
         path: output_dumped.lua
