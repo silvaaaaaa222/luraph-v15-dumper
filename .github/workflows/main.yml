@@ -1,0 +1,39 @@
+name: Dump Luraph v15
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Lua
+      uses: leafo/gh-action-lua@v10
+      with:
+        luaVersion: 5.3
+    
+    - name: Run Dumper
+      run: |
+        lua dumper.lua 25ms_get.lua.txt
+    
+    - name: Check Output
+      run: |
+        if [ -f output_dumped.lua ]; then
+          echo "✅ Dump criado com sucesso!"
+          head -100 output_dumped.lua
+        else
+          echo "❌ Dump falhou"
+        fi
+    
+    - name: Upload Artifact
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: dumped-code
+        path: output_dumped.lua
+        retention-days: 7
