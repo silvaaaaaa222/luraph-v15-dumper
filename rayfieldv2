@@ -1,0 +1,1585 @@
+-- ═══════════════════════════════════════════════════════════════
+-- JOAOZIN MENU — 100% offline, sem HTTP, sem loadstring externo
+-- ═══════════════════════════════════════════════════════════════
+
+-- ── GameId check ───────────────────────────────────────────
+local secureTargetId = tonumber("6490016198")
+if game.GameId ~= secureTargetId and game.PlaceId ~= secureTargetId then
+    warn("[joaozin menu] Jogo errado. PlaceId: " .. tostring(game.PlaceId))
+    return
+end
+
+-- ═══════════════════════════════════════════════════════════
+-- UI ENGINE (embutida, zero deps)
+-- ═══════════════════════════════════════════════════════════
+local UIEngine = (function()
+    local UIS = game:GetService("UserInputService")
+    local TS  = game:GetService("TweenService")
+    local CoreGui = (gethui and gethui()) or game:GetService("CoreGui")
+    local LP  = game:GetService("Players").LocalPlayer
+
+    local ACCENT = Color3.fromRGB(0, 195, 255)
+    local ACCENT2 = Color3.fromRGB(100, 220, 255)
+    local BG_MAIN = Color3.fromRGB(15, 15, 15)
+    local BG_ELEM = Color3.fromRGB(25, 25, 25)
+    local BG_HOVER = Color3.fromRGB(35, 35, 35)
+
+    local Engine = {}
+    local notifContainer
+
+    function Engine:CreateWindow(cfg)
+        cfg = cfg or {}
+        local title = cfg.Name or "joaozin menu"
+        local guiName = "joaozin_" .. tostring(LP.UserId)
+
+        local old = CoreGui:FindFirstChild(guiName)
+        if old then old:Destroy() end
+
+        local gui = Instance.new("ScreenGui")
+        gui.Name = guiName
+        gui.Parent = CoreGui
+        gui.ResetOnSpawn = false
+        gui.IgnoreGuiInset = true
+        if syn and syn.protect_gui then pcall(function() syn.protect_gui(gui) end) end
+
+        -- Notif container
+        notifContainer = Instance.new("Frame")
+        notifContainer.Name = "Notifs"
+        notifContainer.Parent = gui
+        notifContainer.BackgroundTransparency = 1
+        notifContainer.Size = UDim2.new(1, 0, 0, 0)
+        notifContainer.Position = UDim2.new(0, 0, 0, 30)
+        notifContainer.ZIndex = 100
+        local nll = Instance.new("UIListLayout", notifContainer)
+        nll.SortOrder = Enum.SortOrder.LayoutOrder
+        nll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        nll.Padding = UDim.new(0, 10)
+
+        -- Main frame
+        local main = Instance.new("Frame")
+        main.Name = "Main"
+        main.Parent = gui
+        main.BackgroundColor3 = BG_MAIN
+        main.BorderSizePixel = 0
+        main.Position = UDim2.new(0.5, -250, 0.5, -160)
+        main.Size = UDim2.new(0, 500, 0, 350)
+        main.Active = true
+        local mcr = Instance.new("UICorner", main); mcr.CornerRadius = UDim.new(0, 8)
+        local mst = Instance.new("UIStroke", main)
+        mst.Color = Color3.fromRGB(40, 40, 40); mst.Thickness = 1.5
+
+        -- Topbar
+        local top = Instance.new("Frame")
+        top.Name = "Top"
+        top.Parent = main
+        top.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        top.Size = UDim2.new(1, 0, 0, 40)
+        top.BorderSizePixel = 0
+        local tcr = Instance.new("UICorner", top); tcr.CornerRadius = UDim.new(0, 8)
+
+        local titleLbl = Instance.new("TextLabel", top)
+        titleLbl.Text = title
+        titleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        titleLbl.Size = UDim2.new(1, -100, 1, 0)
+        titleLbl.Position = UDim2.new(0, 15, 0, 0)
+        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Font = Enum.Font.GothamBold
+        titleLbl.TextSize = 14
+
+        local close = Instance.new("TextButton", top)
+        close.Size = UDim2.new(0, 35, 0, 35)
+        close.Position = UDim2.new(1, -40, 0.5, -17)
+        close.BackgroundTransparency = 1
+        close.Text = "X"
+        close.TextColor3 = Color3.fromRGB(150, 150, 150)
+        close.Font = Enum.Font.GothamBold
+        close.TextSize = 16
+        close.MouseButton1Click:Connect(function()
+            gui:Destroy()
+        end)
+
+        -- Drag
+        local dragging, dragInput, dragStart, startPos
+        top.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = main.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
+        top.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+        UIS.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local d = input.Position - dragStart
+                main.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + d.X,
+                    startPos.Y.Scale, startPos.Y.Offset + d.Y)
+            end
+        end)
+
+        -- TabBar
+        local tabBar = Instance.new("Frame", main)
+        tabBar.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+        tabBar.Position = UDim2.new(0, 0, 0, 40)
+        tabBar.Size = UDim2.new(0, 110, 1, -40)
+        tabBar.BorderSizePixel = 0
+        local tcr2 = Instance.new("UICorner", tabBar); tcr2.CornerRadius = UDim.new(0, 8)
+        local tll = Instance.new("UIListLayout", tabBar)
+        tll.Padding = UDim.new(0, 6)
+        tll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+        local pages = Instance.new("Frame", main)
+        pages.BackgroundTransparency = 1
+        pages.Position = UDim2.new(0, 120, 0, 50)
+        pages.Size = UDim2.new(1, -130, 1, -60)
+
+        local winAPI = {}
+        local tabCount = 0
+
+        function winAPI:CreateTab(tabName, icon)
+            tabCount = tabCount + 1
+            local page = Instance.new("ScrollingFrame", pages)
+            page.BackgroundTransparency = 1
+            page.Size = UDim2.new(1, 0, 1, 0)
+            page.BorderSizePixel = 0
+            page.ScrollBarThickness = 2
+            page.ScrollBarImageColor3 = ACCENT
+            page.CanvasSize = UDim2.new(0, 0, 0, 0)
+            page.Visible = (tabCount == 1)
+            local pll = Instance.new("UIListLayout", page)
+            pll.Padding = UDim.new(0, 8)
+            pll:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                page.CanvasSize = UDim2.new(0, 0, 0, pll.AbsoluteContentSize.Y)
+            end)
+
+            local btn = Instance.new("TextButton", tabBar)
+            btn.Size = UDim2.new(0, 100, 0, 32)
+            btn.BorderSizePixel = 0
+            btn.Text = tabName
+            btn.Font = Enum.Font.GothamBold
+            btn.TextSize = 11
+            btn.BackgroundColor3 = tabCount == 1 and ACCENT or BG_ELEM
+            btn.TextColor3 = tabCount == 1 and Color3.fromRGB(255,255,255) or Color3.fromRGB(150,150,150)
+            local bcr = Instance.new("UICorner", btn); bcr.CornerRadius = UDim.new(0, 6)
+
+            btn.MouseButton1Click:Connect(function()
+                for _, p in ipairs(pages:GetChildren()) do p.Visible = false end
+                for _, b in ipairs(tabBar:GetChildren()) do
+                    if b:IsA("TextButton") then
+                        b.BackgroundColor3 = BG_ELEM
+                        b.TextColor3 = Color3.fromRGB(150, 150, 150)
+                    end
+                end
+                page.Visible = true
+                btn.BackgroundColor3 = ACCENT
+                btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            end)
+
+            local tabAPI = {}
+            local function safe(cb, ...)
+                if not cb then return end
+                local ok, err = pcall(cb, ...)
+                if not ok then warn("[joaozin] " .. tostring(err)) end
+            end
+
+            -- Button
+            function tabAPI:CreateButton(c)
+                local b = Instance.new("TextButton", page)
+                b.Size = UDim2.new(1, 0, 0, 38)
+                b.BackgroundColor3 = BG_ELEM
+                b.BorderSizePixel = 0
+                b.Text = c.Name or "Button"
+                b.TextColor3 = Color3.fromRGB(255, 255, 255)
+                b.Font = Enum.Font.GothamBold
+                b.TextSize = 13
+                b.AutoButtonColor = false
+                local bcr2 = Instance.new("UICorner", b); bcr2.CornerRadius = UDim.new(0, 6)
+                b.MouseEnter:Connect(function()
+                    TS:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = BG_HOVER}):Play()
+                end)
+                b.MouseLeave:Connect(function()
+                    TS:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = BG_ELEM}):Play()
+                end)
+                b.MouseButton1Click:Connect(function() safe(c.Callback) end)
+                return b
+            end
+
+            -- Toggle
+            function tabAPI:CreateToggle(c)
+                local wrap = Instance.new("TextButton", page)
+                wrap.Size = UDim2.new(1, 0, 0, 38)
+                wrap.BackgroundColor3 = BG_ELEM
+                wrap.BorderSizePixel = 0
+                wrap.Text = ""
+                wrap.AutoButtonColor = false
+                local wcr = Instance.new("UICorner", wrap); wcr.CornerRadius = UDim.new(0, 6)
+
+                local lbl = Instance.new("TextLabel", wrap)
+                lbl.Text = "   " .. (c.Name or "Toggle")
+                lbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+                lbl.Size = UDim2.new(1, -60, 1, 0)
+                lbl.BackgroundTransparency = 1
+                lbl.Font = Enum.Font.Gotham
+                lbl.TextSize = 13
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+                local track = Instance.new("Frame", wrap)
+                track.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                track.Position = UDim2.new(1, -45, 0.5, -10)
+                track.Size = UDim2.new(0, 36, 0, 20)
+                track.BorderSizePixel = 0
+                local tkcr = Instance.new("UICorner", track); tkcr.CornerRadius = UDim.new(1, 0)
+
+                local knob = Instance.new("Frame", track)
+                knob.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+                knob.Position = UDim2.new(0, 2, 0.5, -8)
+                knob.Size = UDim2.new(0, 16, 0, 16)
+                knob.BorderSizePixel = 0
+                local kncr = Instance.new("UICorner", knob); kncr.CornerRadius = UDim.new(1, 0)
+
+                local state = c.CurrentValue or false
+                local function setVis(s)
+                    if s then
+                        TS:Create(knob, TweenInfo.new(0.3), {
+                            Position = UDim2.new(1, -18, 0.5, -8),
+                            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                        }):Play()
+                        TS:Create(track, TweenInfo.new(0.3), {BackgroundColor3 = ACCENT}):Play()
+                    else
+                        TS:Create(knob, TweenInfo.new(0.3), {
+                            Position = UDim2.new(0, 2, 0.5, -8),
+                            BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+                        }):Play()
+                        TS:Create(track, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+                    end
+                end
+                setVis(state)
+
+                wrap.MouseEnter:Connect(function()
+                    TS:Create(wrap, TweenInfo.new(0.2), {BackgroundColor3 = BG_HOVER}):Play()
+                end)
+                wrap.MouseLeave:Connect(function()
+                    TS:Create(wrap, TweenInfo.new(0.2), {BackgroundColor3 = BG_ELEM}):Play()
+                end)
+                wrap.MouseButton1Click:Connect(function()
+                    state = not state
+                    setVis(state)
+                    safe(c.Callback, state)
+                end)
+                return wrap
+            end
+
+            -- Slider
+            function tabAPI:CreateSlider(c)
+                local box = Instance.new("Frame", page)
+                box.Size = UDim2.new(1, 0, 0, 50)
+                box.BackgroundColor3 = BG_ELEM
+                box.BorderSizePixel = 0
+                local bcr3 = Instance.new("UICorner", box); bcr3.CornerRadius = UDim.new(0, 6)
+
+                local minV = c.Range and c.Range[1] or 0
+                local maxV = c.Range and c.Range[2] or 100
+                local initV = c.CurrentValue or minV
+
+                local lbl = Instance.new("TextLabel", box)
+                lbl.Text = "   " .. (c.Name or "Slider") .. " : " .. tostring(initV)
+                lbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+                lbl.Size = UDim2.new(1, 0, 0, 25)
+                lbl.BackgroundTransparency = 1
+                lbl.Font = Enum.Font.Gotham
+                lbl.TextSize = 12
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+                local track = Instance.new("Frame", box)
+                track.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                track.Position = UDim2.new(0, 10, 0, 30)
+                track.Size = UDim2.new(1, -20, 0, 6)
+                track.BorderSizePixel = 0
+                local tcr3 = Instance.new("UICorner", track); tcr3.CornerRadius = UDim.new(1, 0)
+
+                local pct = math.clamp((initV - minV) / (maxV - minV), 0, 1)
+                local fill = Instance.new("Frame", track)
+                fill.BackgroundColor3 = ACCENT
+                fill.Size = UDim2.new(pct, 0, 1, 0)
+                fill.BorderSizePixel = 0
+                local fcr = Instance.new("UICorner", fill); fcr.CornerRadius = UDim.new(1, 0)
+
+                local dragging = false
+                local function upd(input)
+                    local p = math.clamp(
+                        (input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X,
+                        0, 1)
+                    fill.Size = UDim2.new(p, 0, 1, 0)
+                    local v = math.floor((maxV - minV) * p + minV)
+                    lbl.Text = "   " .. (c.Name or "Slider") .. " : " .. tostring(v)
+                    safe(c.Callback, v)
+                end
+                track.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1
+                        or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = true
+                        upd(input)
+                    end
+                end)
+                UIS.InputChanged:Connect(function(input)
+                    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+                        or input.UserInputType == Enum.UserInputType.Touch) then
+                        upd(input)
+                    end
+                end)
+                UIS.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1
+                        or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = false
+                    end
+                end)
+                return box
+            end
+
+            -- Input
+            function tabAPI:CreateInput(c)
+                local box = Instance.new("Frame", page)
+                box.Size = UDim2.new(1, 0, 0, 38)
+                box.BackgroundColor3 = BG_ELEM
+                box.BorderSizePixel = 0
+                local bcr4 = Instance.new("UICorner", box); bcr4.CornerRadius = UDim.new(0, 6)
+
+                local tb = Instance.new("TextBox", box)
+                tb.Size = UDim2.new(1, -20, 1, 0)
+                tb.Position = UDim2.new(0, 10, 0, 0)
+                tb.BackgroundTransparency = 1
+                tb.Text = c.CurrentValue or ""
+                tb.PlaceholderText = c.PlaceholderText or c.Name or "..."
+                tb.TextColor3 = Color3.fromRGB(200, 200, 200)
+                tb.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+                tb.Font = Enum.Font.Gotham
+                tb.TextSize = 13
+                tb.TextXAlignment = Enum.TextXAlignment.Left
+                tb.ClearTextOnFocus = false
+
+                tb.FocusLost:Connect(function()
+                    safe(c.Callback, tb.Text)
+                end)
+                return tb
+            end
+
+            -- Label
+            function tabAPI:CreateLabel(text)
+                local l = Instance.new("TextLabel", page)
+                l.Size = UDim2.new(1, 0, 0, 24)
+                l.BackgroundTransparency = 1
+                l.Text = text
+                l.TextColor3 = Color3.fromRGB(190, 190, 190)
+                l.Font = Enum.Font.Gotham
+                l.TextSize = 12
+                l.TextXAlignment = Enum.TextXAlignment.Left
+                l.TextWrapped = true
+                return l
+            end
+
+            return tabAPI
+        end
+
+        return winAPI
+    end
+
+    function Engine:Notify(cfg)
+        if not notifContainer or not notifContainer.Parent then return end
+        cfg = cfg or {}
+        local f = Instance.new("Frame", notifContainer)
+        f.Size = UDim2.new(0, 300, 0, 40)
+        f.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        f.BackgroundTransparency = 1
+        f.BorderSizePixel = 0
+        local fcr = Instance.new("UICorner", f); fcr.CornerRadius = UDim.new(0, 8)
+        local fst = Instance.new("UIStroke", f)
+        fst.Color = ACCENT; fst.Thickness = 1.5; fst.Transparency = 1
+
+        local l = Instance.new("TextLabel", f)
+        l.Size = UDim2.new(1, -20, 1, 0)
+        l.Position = UDim2.new(0, 10, 0, 0)
+        l.BackgroundTransparency = 1
+        l.Text = (cfg.Title or "joaozin") .. ": " .. (cfg.Content or "")
+        l.TextColor3 = Color3.fromRGB(255, 255, 255)
+        l.Font = Enum.Font.GothamBold
+        l.TextSize = 13
+        l.TextWrapped = true
+        l.TextTransparency = 1
+
+        TS:Create(f, TweenInfo.new(0.3), {BackgroundTransparency = 0.1}):Play()
+        TS:Create(fst, TweenInfo.new(0.3), {Transparency = 0}):Play()
+        TS:Create(l, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+
+        task.delay(cfg.Duration or 3, function()
+            if not f or not f.Parent then return end
+            TS:Create(f, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+            TS:Create(fst, TweenInfo.new(0.3), {Transparency = 1}):Play()
+            TS:Create(l, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+            task.wait(0.3)
+            f:Destroy()
+        end)
+    end
+
+    return Engine
+end)()
+
+-- ═══════════════════════════════════════════════════════════
+-- CRIA A JANELA
+-- ═══════════════════════════════════════════════════════════
+local Window = UIEngine:CreateWindow({ Name = "joaozin menu" })
+
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace  = game:GetService("Workspace")
+local Lighting   = game:GetService("Lighting")
+local LP         = Players.LocalPlayer
+
+-- ── Kill Basic Admin ───────────────────────────────────────
+task.spawn(function()
+    local ps = LP:WaitForChild("PlayerScripts", 10)
+    if not ps then return end
+    local ba = ps:FindFirstChild("Basic Admin Client")
+    if ba then ba:Destroy() return end
+    ba = ps:WaitForChild("Basic Admin Client", 10)
+    if ba then ba:Destroy() end
+end)
+
+-- ── Helpers ────────────────────────────────────────────────
+local function getChar() return LP.Character end
+local function getHRP()
+    local c = getChar()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+local function getHum()
+    local c = getChar()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function hasTool(name)
+    local c = getChar()
+    if c and c:FindFirstChild(name) then return c:FindFirstChild(name) end
+    local bp = LP:FindFirstChildOfClass("Backpack")
+    if bp and bp:FindFirstChild(name) then return bp:FindFirstChild(name) end
+    return nil
+end
+local function equip(tool)
+    local hum = getHum()
+    if hum and tool then pcall(function() hum:EquipTool(tool) end) end
+end
+local function useTool(tool)
+    if not tool then return end
+    local atk = tool:FindFirstChild("Attack")
+    if atk and atk:IsA("RemoteEvent") then
+        pcall(function() atk:FireServer() end)
+    else
+        pcall(function() tool:Activate() end)
+    end
+end
+local function firePrompt(prompt)
+    if not prompt then return end
+    pcall(function() fireproximityprompt(prompt) end)
+    pcall(function()
+        if prompt.Triggered then
+            prompt:InputHoldBegin()
+            prompt:InputHoldEnd()
+        end
+    end)
+end
+local function fireTouch(part, obj)
+    if not firetouchinterest then return end
+    pcall(function()
+        firetouchinterest(part, obj, 0)
+        task.wait(0.05)
+        firetouchinterest(part, obj, 1)
+    end)
+end
+
+-- ═══════════════════════════════════════════════════════════
+-- TABS
+-- ═══════════════════════════════════════════════════════════
+local MainTab     = Window:CreateTab("Main")
+local AutofarmTab = Window:CreateTab("Autofarm")
+local PlayerTab   = Window:CreateTab("Player")
+local MiscTab     = Window:CreateTab("Misc")
+local PvpTab      = Window:CreateTab("PvP")
+local VisualsTab  = Window:CreateTab("Visuals")
+
+UIEngine:Notify({ Title = "joaozin menu", Content = "Carregado com sucesso.", Duration = 4 })
+
+-- ── MAIN ACTIONS ───────────────────────────────────────────
+local function StealMoneyAction()
+    local ts = Workspace:FindFirstChild("TycoonSets")
+    if not ts then return end
+    local hrp = getHRP()
+    if not hrp then return end
+    for _, obj in ipairs(ts:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name == "Giver" then
+            fireTouch(hrp, obj)
+        end
+    end
+end
+
+local function BringToolsAction()
+    local hrp = getHRP()
+    if not hrp then return end
+    local names = { ["Wood"] = true, ["Mishirin Ore"] = true, ["Raw Meat"] = true }
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if names[obj.Name] and obj:IsA("Tool") then
+            local h = obj:FindFirstChild("Handle")
+            if h and h:IsA("BasePart") and not h.Anchored then
+                pcall(function()
+                    if h.CanSetNetworkOwnership and h:CanSetNetworkOwnership() then
+                        h:SetNetworkOwner(LP)
+                    end
+                    local old = hrp.CFrame
+                    hrp.CFrame = h.CFrame
+                    task.wait(0.05)
+                    hrp.CFrame = old
+                end)
+            end
+        end
+    end
+end
+
+local function SetPlayersVisible(v)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            for _, part in ipairs(p.Character:GetDescendants()) do
+                if part:IsA("BasePart") or part:IsA("Decal") then
+                    pcall(function() part.Transparency = v and 0 or 1 end)
+                end
+            end
+        end
+    end
+end
+
+local function SellMaterialsAction()
+    local ls = LP:FindFirstChild("leaderstats")
+    local cash = ls and ls:FindFirstChild("Cash")
+    local ic = cash and tostring(cash.Value) or nil
+    local hrp = getHRP()
+    if not hrp then return end
+    local old = hrp.CFrame
+    SetPlayersVisible(false)
+
+    hrp.CFrame = CFrame.new(-512, 392, -152)
+    task.wait(0.1)
+    local lj = Workspace:FindFirstChild("Lumberjack")
+    local p1 = lj and lj:FindFirstChild("ProxPrompt", true)
+    if p1 and p1:IsA("ProximityPrompt") then
+        p1.HoldDuration = 0
+        p1.MaxActivationDistance = 10000
+        p1.KeyboardKeyCode = Enum.KeyCode.F
+        local t = tick()
+        while tick() - t < 1.5 do
+            firePrompt(p1)
+            if cash and tostring(cash.Value) ~= ic then break end
+            task.wait(0.05)
+        end
+    end
+
+    ic = cash and tostring(cash.Value) or ic
+    hrp.CFrame = CFrame.new(-87, 395, 57)
+    task.wait(0.1)
+    local mn = Workspace:FindFirstChild("Miner")
+    local p2 = mn and mn:FindFirstChild("ProxPrompt", true)
+    if p2 and p2:IsA("ProximityPrompt") then
+        p2.RequiresLineOfSight = false
+        p2.KeyboardKeyCode = Enum.KeyCode.F
+        p2.HoldDuration = 0
+        p2.Exclusivity = Enum.ProximityPromptExclusivity.AlwaysShow
+        p2.MaxActivationDistance = 100
+        local t = tick()
+        while tick() - t < 1.5 do
+            firePrompt(p2)
+            if cash and tostring(cash.Value) ~= ic then break end
+            task.wait(0.05)
+        end
+    end
+
+    hrp.CFrame = old
+    SetPlayersVisible(true)
+end
+
+MainTab:CreateButton({
+    Name = "Steal Money",
+    Callback = function()
+        StealMoneyAction()
+        UIEngine:Notify({ Title = "joaozin", Content = "Steal Money executado", Duration = 2 })
+    end
+})
+MainTab:CreateButton({
+    Name = "Sell Materials",
+    Callback = function()
+        SellMaterialsAction()
+        UIEngine:Notify({ Title = "joaozin", Content = "Materiais vendidos", Duration = 2 })
+    end
+})
+MainTab:CreateButton({
+    Name = "Bring Dropped Items",
+    Callback = function()
+        BringToolsAction()
+        UIEngine:Notify({ Title = "joaozin", Content = "Itens trazidos", Duration = 2 })
+    end
+})
+
+-- ── AUTO STEAL ─────────────────────────────────────────────
+local autoSteal = false
+AutofarmTab:CreateToggle({
+    Name = "Auto Steal",
+    Callback = function(state)
+        autoSteal = state
+        UIEngine:Notify({ Title = "joaozin", Content = state and "Auto Steal ON" or "Auto Steal OFF", Duration = 2 })
+        if state then
+            task.spawn(function()
+                while autoSteal do
+                    pcall(StealMoneyAction)
+                    task.wait(60)
+                end
+            end)
+        end
+    end
+})
+
+-- ── AUTO WOODS ─────────────────────────────────────────────
+local autoWoods = false
+local modTrees = {}
+local woodsFloat
+
+local function getHatchet()
+    local c = getChar()
+    if not c then return nil end
+    local bp = LP:FindFirstChildOfClass("Backpack")
+    return c:FindFirstChild("Sun Hatchet")
+        or (bp and bp:FindFirstChild("Sun Hatchet"))
+        or c:FindFirstChild("Hatchet")
+        or (bp and bp:FindFirstChild("Hatchet"))
+end
+local function equipHatchet()
+    local t = getHatchet()
+    if t then equip(t); useTool(t) end
+end
+
+AutofarmTab:CreateToggle({
+    Name = "Auto Woods",
+    Callback = function(state)
+        autoWoods = state
+        UIEngine:Notify({ Title = "joaozin", Content = state and "Auto Woods ON" or "Auto Woods OFF", Duration = 2 })
+        if not state then
+            pcall(function()
+                for p, d in pairs(modTrees) do
+                    if p and p.Parent then
+                        p.Size = d.Size
+                        if d.MeshObj and d.MeshScale then d.MeshObj.Scale = d.MeshScale end
+                    end
+                end
+                modTrees = {}
+            end)
+            if woodsFloat then woodsFloat:Destroy() woodsFloat = nil end
+            local hrp = getHRP()
+            if hrp then hrp.Anchored = false end
+            return
+        end
+        task.spawn(function()
+            while autoWoods do
+                local hrp = getHRP()
+                local hum = getHum()
+                if not hrp or not hum then task.wait(1) continue end
+                local orig = hrp.CFrame
+                if not woodsFloat or not woodsFloat.Parent then
+                    woodsFloat = Instance.new("Part")
+                    woodsFloat.Size = Vector3.new(6, 1, 6)
+                    woodsFloat.Transparency = 1
+                    woodsFloat.CanCollide = true
+                    woodsFloat.Anchored = true
+                    woodsFloat.Parent = Workspace
+                end
+                local map = Workspace:FindFirstChild("Map")
+                if map then
+                    local tnames = {
+                        ["MtnTree"]=true, ["SnowTree"]=true, ["RiceFieldTree"]=true,
+                        ["BETTER TREE"]=true, ["SpruceTree"]=true, ["WisteriaTree"]=true
+                    }
+                    local lastH = hum.Health
+                    local dmg = false
+                    local cn = hum.HealthChanged:Connect(function(nh)
+                        if nh < lastH then dmg = true end
+                        lastH = nh
+                    end)
+                    for _, tm in ipairs(map:GetDescendants()) do
+                        if not autoWoods then break end
+                        if tm:IsA("Model") and tnames[tm.Name] then
+                            local hit = tm:FindFirstChild("WoodHitPart", true)
+                            if hit and hit:IsA("BasePart") and hit.Transparency < 1 then
+                                pcall(function()
+                                    if not modTrees[hit] then
+                                        local mesh = hit:FindFirstChildOfClass("SpecialMesh")
+                                            or hit:FindFirstChildOfClass("BlockMesh")
+                                            or hit:FindFirstChildOfClass("CylinderMesh")
+                                        modTrees[hit] = {
+                                            Size = hit.Size,
+                                            MeshObj = mesh,
+                                            MeshScale = mesh and mesh.Scale or nil
+                                        }
+                                    end
+                                    local mesh = hit:FindFirstChildOfClass("SpecialMesh")
+                                        or hit:FindFirstChildOfClass("BlockMesh")
+                                        or hit:FindFirstChildOfClass("CylinderMesh")
+                                    if mesh then mesh.Scale = Vector3.new(5,5,5) end
+                                    hit.Size = Vector3.new(5,5,5)
+                                    local function countWood()
+                                        local n = 0
+                                        local bp = LP:FindFirstChildOfClass("Backpack")
+                                        if bp then for _, i in ipairs(bp:GetChildren()) do
+                                            if i.Name == "Wood" then n = n + 1 end
+                                        end end
+                                        local c = getChar()
+                                        if c then for _, i in ipairs(c:GetChildren()) do
+                                            if i.Name == "Wood" then n = n + 1 end
+                                        end end
+                                        return n
+                                    end
+                                    local ini = countWood()
+                                    local angs = {0, math.pi/2, math.pi, 3*math.pi/2}
+                                    local r = 3.5
+                                    local i = 1
+                                    while autoWoods and hit and hit.Parent and hit.Transparency < 1 do
+                                        if dmg then
+                                            if woodsFloat then woodsFloat.CFrame = CFrame.new(0,-5000,0) end
+                                            hrp.CFrame = orig
+                                            task.wait(1)
+                                            dmg = false
+                                            lastH = hum.Health
+                                        end
+                                        local a = angs[i]
+                                        local off = Vector3.new(math.cos(a)*r, 0, math.sin(a)*r)
+                                        local tgt = hit.Position + off
+                                        hrp.CFrame = CFrame.new(tgt, Vector3.new(hit.Position.X, tgt.Y, hit.Position.Z))
+                                        if woodsFloat then woodsFloat.CFrame = hrp.CFrame - Vector3.new(0,3.5,0) end
+                                        equipHatchet()
+                                        if countWood() > ini then break end
+                                        i = i % #angs + 1
+                                        task.wait(0.15)
+                                    end
+                                end)
+                            end
+                        end
+                    end
+                    if cn then cn:Disconnect() end
+                end
+                if woodsFloat then woodsFloat.CFrame = CFrame.new(0,-5000,0) end
+                if hrp then hrp.Anchored = false; hrp.CFrame = orig end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+-- ── AUTO ORE ───────────────────────────────────────────────
+local autoOre = false
+local oreFloat
+
+local function getPickaxe()
+    local c = getChar()
+    if not c then return nil end
+    local bp = LP:FindFirstChildOfClass("Backpack")
+    return c:FindFirstChild("Sun Pickaxe")
+        or (bp and bp:FindFirstChild("Sun Pickaxe"))
+        or c:FindFirstChild("Pickaxe")
+        or (bp and bp:FindFirstChild("Pickaxe"))
+end
+local function equipPickaxe()
+    local t = getPickaxe()
+    if t then equip(t); useTool(t) end
+end
+
+AutofarmTab:CreateToggle({
+    Name = "Auto Ore",
+    Callback = function(state)
+        autoOre = state
+        UIEngine:Notify({ Title = "joaozin", Content = state and "Auto Ore ON" or "Auto Ore OFF", Duration = 2 })
+        if not state then
+            if oreFloat then oreFloat:Destroy() oreFloat = nil end
+            local hrp = getHRP()
+            if hrp then hrp.Anchored = false end
+            return
+        end
+        task.spawn(function()
+            while autoOre do
+                local hrp = getHRP()
+                local hum = getHum()
+                if not hrp or not hum then task.wait(1) continue end
+                local orig = hrp.CFrame
+                if not oreFloat or not oreFloat.Parent then
+                    oreFloat = Instance.new("Part")
+                    oreFloat.Size = Vector3.new(6,1,6)
+                    oreFloat.Transparency = 1
+                    oreFloat.CanCollide = true
+                    oreFloat.Anchored = true
+                    oreFloat.Parent = Workspace
+                end
+                local lastH = hum.Health
+                local dmg = false
+                local cn = hum.HealthChanged:Connect(function(nh)
+                    if nh < lastH then dmg = true end
+                    lastH = nh
+                end)
+                for _, hit in ipairs(Workspace:GetDescendants()) do
+                    if not autoOre then break end
+                    if hit:IsA("BasePart") and hit.Name == "RockHitPart" and hit.Transparency < 1 then
+                        pcall(function()
+                            local function countOre()
+                                local n = 0
+                                local bp = LP:FindFirstChildOfClass("Backpack")
+                                if bp then for _, i in ipairs(bp:GetChildren()) do
+                                    if i.Name == "Mishirin Ore" or i.Name:match("Ore") then n = n + 1 end
+                                end end
+                                local c = getChar()
+                                if c then for _, i in ipairs(c:GetChildren()) do
+                                    if i.Name == "Mishirin Ore" or i.Name:match("Ore") then n = n + 1 end
+                                end end
+                                return n
+                            end
+                            local ini = countOre()
+                            local angs = {0, math.pi/2, math.pi, 3*math.pi/2}
+                            local r = 3.5
+                            local i = 1
+                            while autoOre and hit and hit.Parent and hit.Transparency < 1 do
+                                if dmg then
+                                    if oreFloat then oreFloat.CFrame = CFrame.new(0,-5000,0) end
+                                    hrp.CFrame = orig
+                                    task.wait(1)
+                                    dmg = false
+                                    lastH = hum.Health
+                                end
+                                local a = angs[i]
+                                local off = Vector3.new(math.cos(a)*r, 0, math.sin(a)*r)
+                                local tgt = hit.Position + off
+                                hrp.CFrame = CFrame.new(tgt, Vector3.new(hit.Position.X, tgt.Y, hit.Position.Z))
+                                if oreFloat then oreFloat.CFrame = hrp.CFrame - Vector3.new(0,3.5,0) end
+                                equipPickaxe()
+                                if countOre() > ini then break end
+                                i = i % #angs + 1
+                                task.wait(0.15)
+                            end
+                        end)
+                    end
+                end
+                if cn then cn:Disconnect() end
+                if oreFloat then oreFloat.CFrame = CFrame.new(0,-5000,0) end
+                if hrp then hrp.Anchored = false; hrp.CFrame = orig end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+-- ── AUTO MOBS / BOSS ───────────────────────────────────────
+local function hasToolNamed(n)
+    local c = getChar()
+    if c and c:FindFirstChild(n) then return true end
+    local bp = LP:FindFirstChildOfClass("Backpack")
+    if bp and bp:FindFirstChild(n) then return true end
+    return false
+end
+
+local function processStrongSoul(hrp)
+    if hasToolNamed("Strong Soul") then return end
+    local g = Workspace:FindFirstChild("StrongSoulGroup")
+    if not g then return end
+    for _, core in ipairs(g:GetChildren()) do
+        local cp = core:FindFirstChild("Core")
+        local p = cp and cp:FindFirstChild("ProximityPrompt")
+        if cp and cp:IsA("BasePart") and p and p:IsA("ProximityPrompt") then
+            p.MaxActivationDistance = 1000
+            p.HoldDuration = 0
+            p.RequiresLineOfSight = false
+            p.KeyboardKeyCode = Enum.KeyCode.F
+            local t = tick()
+            while cp.Parent and not hasToolNamed("Strong Soul") and tick()-t < 3 do
+                hrp.CFrame = cp.CFrame + Vector3.new(0,3,0)
+                firePrompt(p)
+                task.wait(0.1)
+            end
+        end
+    end
+end
+
+local function processDrops(hrp)
+    local ls = LP:FindFirstChild("leaderstats")
+    local cash = ls and ls:FindFirstChild("Cash")
+    local names = { ["MoneyBag"]=true, ["RawMeatPart"]=true, ["OrePart"]=true }
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if names[obj.Name] and obj:IsA("BasePart") then
+            local p = obj:FindFirstChildOfClass("ProximityPrompt")
+                or obj:FindFirstChild("ProximityPrompt", true)
+            if p and p:IsA("ProximityPrompt") then
+                p.MaxActivationDistance = 1000
+                p.HoldDuration = 0
+                p.RequiresLineOfSight = false
+                p.KeyboardKeyCode = Enum.KeyCode.F
+                local ic = cash and cash.Value or 0
+                local t = tick()
+                while obj.Parent and tick()-t < 3 do
+                    hrp.CFrame = obj.CFrame + Vector3.new(0,3,0)
+                    firePrompt(p)
+                    if cash and cash.Value ~= ic then break end
+                    task.wait(0.1)
+                end
+            end
+        end
+    end
+end
+
+local function processBigMoneyBag(hrp)
+    local bmb = Workspace:FindFirstChild("BigMoneyBag")
+    if bmb and bmb:IsA("BasePart") then
+        local p = bmb:FindFirstChildOfClass("ProximityPrompt")
+            or bmb:FindFirstChild("ProximityPrompt", true)
+        if p and p:IsA("ProximityPrompt") then
+            p.MaxActivationDistance = 1000
+            p.HoldDuration = 0
+            p.RequiresLineOfSight = false
+            p.KeyboardKeyCode = Enum.KeyCode.F
+            local t = tick()
+            while bmb.Parent and tick()-t < 3 do
+                hrp.CFrame = bmb.CFrame + Vector3.new(0,3,0)
+                firePrompt(p)
+                task.wait(0.1)
+            end
+        end
+    end
+end
+
+local function makeAutoKill(holderName, isBoss)
+    return function(state)
+        local enabled = state
+        UIEngine:Notify({ Title = "joaozin", Content = state and (holderName.." ON") or (holderName.." OFF"), Duration = 2 })
+        if not state then return end
+        task.spawn(function()
+            while enabled do
+                local holder = Workspace:FindFirstChild(holderName)
+                if not holder then task.wait(1) continue end
+                local hrp = getHRP()
+                if not hrp then task.wait(1) continue end
+                local orig = hrp.CFrame
+                local flt = Instance.new("Part")
+                flt.Size = Vector3.new(6,1,6)
+                flt.Transparency = 1
+                flt.CanCollide = true
+                flt.Anchored = true
+                flt.Parent = Workspace
+                local cam = Workspace.CurrentCamera
+                local targets = {}
+                for _, ch in ipairs(holder:GetChildren()) do
+                    if ch:IsA("Model") then
+                        local h = ch:FindFirstChildOfClass("Humanoid")
+                        local thrp = ch:FindFirstChild("HumanoidRootPart")
+                        if h and thrp and h.Health > 0 then
+                            local torso = ch:FindFirstChild("Torso") or ch:FindFirstChild("UpperTorso")
+                            if ch.Name == "Boar" or torso then
+                                table.insert(targets, ch)
+                            end
+                        end
+                    end
+                end
+                for _, tgt in ipairs(targets) do
+                    if not enabled then break end
+                    local th = tgt:FindFirstChildOfClass("Humanoid")
+                    local thrp = tgt:FindFirstChild("HumanoidRootPart")
+                    if th and thrp and th.Health > 0 then
+                        cam.CameraSubject = th
+                        local isBoar = (tgt.Name == "Boar")
+                        local torso = not isBoar and (tgt:FindFirstChild("Torso") or tgt:FindFirstChild("UpperTorso"))
+                        if torso then
+                            torso.Size = Vector3.new(isBoss and 6 or 4, isBoss and 180 or 90, isBoss and 6 or 4)
+                            torso.Transparency = 1
+                            torso.CanCollide = false
+                            torso.Anchored = true
+                        end
+                        thrp.Anchored = true
+                        local angs = {0, math.pi/2, math.pi, 3*math.pi/2}
+                        local r = isBoss and 6 or 3.5
+                        local i = 1
+                        while enabled and th.Health > 0 and tgt.Parent do
+                            local cTorso = not isBoar and (tgt:FindFirstChild("Torso") or tgt:FindFirstChild("UpperTorso"))
+                            local cHrp = tgt:FindFirstChild("HumanoidRootPart")
+                            local mHrp = getHRP()
+                            local mHum = getHum()
+                            if cHrp and mHrp and mHum then
+                                for _, part in ipairs(getChar():GetDescendants()) do
+                                    if part:IsA("BasePart") then part.CanCollide = false end
+                                end
+                                local base
+                                if isBoar then
+                                    base = cHrp.Position
+                                else
+                                    base = (cTorso and cTorso.Position or cHrp.Position)
+                                        - Vector3.new(0, isBoss and 90 or 40, 0)
+                                end
+                                local a = angs[i]
+                                local off = Vector3.new(math.cos(a)*r, 0, math.sin(a)*r)
+                                local tp = base + off
+                                mHrp.CFrame = CFrame.new(tp, Vector3.new(base.X, tp.Y, base.Z))
+                                flt.CFrame = mHrp.CFrame - Vector3.new(0,3.5,0)
+                                processStrongSoul(mHrp)
+                                processDrops(mHrp)
+                                processBigMoneyBag(mHrp)
+                                local axe = getHatchet()
+                                if axe then equip(axe); useTool(axe) end
+                                i = i % #angs + 1
+                            end
+                            task.wait(0.15)
+                        end
+                        local fHrp = getHRP()
+                        if fHrp then
+                            processStrongSoul(fHrp)
+                            processDrops(fHrp)
+                            processBigMoneyBag(fHrp)
+                        end
+                    end
+                end
+                local hum = getHum()
+                if hum then cam.CameraSubject = hum end
+                flt:Destroy()
+                local h2 = getHRP()
+                if h2 then h2.CFrame = orig end
+                task.wait(1)
+            end
+        end)
+    end
+end
+
+AutofarmTab:CreateToggle({ Name = "Auto Mobs", Callback = makeAutoKill("MobsHolder", false) })
+AutofarmTab:CreateToggle({ Name = "Auto Boss", Callback = makeAutoKill("BossHolder", true) })
+
+-- ── PLAYER TAB ─────────────────────────────────────────────
+PlayerTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 200},
+    CurrentValue = 16,
+    Callback = function(v)
+        local hum = getHum(); if hum then hum.WalkSpeed = v end
+    end
+})
+PlayerTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {50, 300},
+    CurrentValue = 50,
+    Callback = function(v)
+        local hum = getHum()
+        if hum then hum.UseJumpPower = true; hum.JumpPower = v end
+    end
+})
+PlayerTab:CreateSlider({
+    Name = "Gravity",
+    Range = {0, 196},
+    CurrentValue = 196,
+    Callback = function(v) Workspace.Gravity = v end
+})
+
+local tpWalk = false
+local tpWalkSpd = 1
+local tpConn
+PlayerTab:CreateSlider({
+    Name = "TPWalk Speed",
+    Range = {1, 20},
+    CurrentValue = 1,
+    Callback = function(v) tpWalkSpd = v end
+})
+PlayerTab:CreateToggle({
+    Name = "TPWalk",
+    Callback = function(state)
+        tpWalk = state
+        UIEngine:Notify({ Title = "joaozin", Content = state and "TPWalk ON" or "TPWalk OFF", Duration = 2 })
+        if tpConn then tpConn:Disconnect() tpConn = nil end
+        if state then
+            tpConn = RunService.RenderStepped:Connect(function(dt)
+                if not tpWalk then return end
+                local hrp = getHRP()
+                local hum = getHum()
+                if hrp and hum and hum.MoveDirection.Magnitude > 0 then
+                    local dir = hum.MoveDirection.Unit
+                    local off = dir * tpWalkSpd * (dt * 60)
+                    hrp.CFrame = hrp.CFrame:Lerp(hrp.CFrame + off, 0.35)
+                end
+            end)
+        end
+    end
+})
+
+local infJumpConn
+PlayerTab:CreateToggle({
+    Name = "Infinite Jump",
+    Callback = function(state)
+        UIEngine:Notify({ Title = "joaozin", Content = state and "InfJump ON" or "InfJump OFF", Duration = 2 })
+        if infJumpConn then infJumpConn:Disconnect() infJumpConn = nil end
+        if state then
+            infJumpConn = game:GetService("UserInputService").JumpRequest:Connect(function()
+                local hum = getHum()
+                if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+            end)
+        end
+    end
+})
+
+local flyConn
+PlayerTab:CreateToggle({
+    Name = "Fly (WASD + Space/Ctrl)",
+    Callback = function(state)
+        UIEngine:Notify({ Title = "joaozin", Content = state and "Fly ON" or "Fly OFF", Duration = 2 })
+        if flyConn then flyConn:Disconnect() flyConn = nil end
+        local hrp = getHRP(); local hum = getHum()
+        if not hrp or not hum then return end
+        if state then
+            local bg = Instance.new("BodyGyro")
+            bg.Name = "FlyGyro"; bg.MaxTorque = Vector3.new(9e4,9e4,9e4); bg.P = 2e4
+            bg.CFrame = hrp.CFrame; bg.Parent = hrp
+            local bv = Instance.new("BodyVelocity")
+            bv.Name = "FlyVelocity"; bv.Velocity = Vector3.new(0,0.1,0)
+            bv.MaxForce = Vector3.new(9e4,9e4,9e4); bv.Parent = hrp
+            hum.PlatformStand = true
+            local UIS = game:GetService("UserInputService")
+            flyConn = RunService.RenderStepped:Connect(function()
+                if not hrp.Parent then return end
+                local mv = Vector3.new()
+                local cam = Workspace.CurrentCamera
+                if UIS:IsKeyDown(Enum.KeyCode.W) then mv = mv + cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then mv = mv - cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then mv = mv + cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then mv = mv - cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then mv = mv + Vector3.new(0,1,0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then mv = mv - Vector3.new(0,1,0) end
+                if mv.Magnitude > 0 then bv.Velocity = mv.Unit * 50
+                else bv.Velocity = Vector3.new(0,0.1,0) end
+                bg.CFrame = cam.CFrame
+            end)
+        else
+            local bg = hrp:FindFirstChild("FlyGyro"); if bg then bg:Destroy() end
+            local bv = hrp:FindFirstChild("FlyVelocity"); if bv then bv:Destroy() end
+            if hum then hum.PlatformStand = false end
+        end
+    end
+})
+
+local noclipConn
+PlayerTab:CreateToggle({
+    Name = "No Clip",
+    Callback = function(state)
+        UIEngine:Notify({ Title = "joaozin", Content = state and "No Clip ON" or "No Clip OFF", Duration = 2 })
+        if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+        if state then
+            noclipConn = RunService.Stepped:Connect(function()
+                local c = getChar()
+                if c then
+                    for _, part in ipairs(c:GetDescendants()) do
+                        if part:IsA("BasePart") then part.CanCollide = false end
+                    end
+                end
+            end)
+        end
+    end
+})
+
+local safeConn
+PlayerTab:CreateToggle({
+    Name = "Safe Mode",
+    Callback = function(state)
+        UIEngine:Notify({ Title = "joaozin", Content = state and "Safe Mode ON" or "Safe Mode OFF", Duration = 2 })
+        if safeConn then safeConn:Disconnect() safeConn = nil end
+        local spots = {
+            CFrame.new(310, 492, 378),
+            CFrame.new(-776, 560, 946),
+            CFrame.new(-1339, 503, -1213)
+        }
+        local ret = CFrame.new(-382, 382, 26)
+        if state then
+            local trig = false
+            safeConn = RunService.Heartbeat:Connect(function()
+                if trig then return end
+                local hum = getHum(); local hrp = getHRP()
+                if hum and hrp and hum.Health > 0 and hum.Health / hum.MaxHealth < 0.10 then
+                    trig = true
+                    UIEngine:Notify({ Title = "joaozin", Content = "Safe Mode ativado!", Duration = 2 })
+                    hrp.CFrame = spots[math.random(1, #spots)]
+                    task.spawn(function()
+                        task.wait(8)
+                        local h2 = getHRP()
+                        if h2 then h2.CFrame = ret end
+                        UIEngine:Notify({ Title = "joaozin", Content = "Retorno do Safe Mode.", Duration = 2 })
+                        task.wait(2)
+                        trig = false
+                    end)
+                end
+            end)
+        end
+    end
+})
+
+-- ── MISC TAB ───────────────────────────────────────────────
+local autoBring = false
+MiscTab:CreateToggle({
+    Name = "Auto Bring Dropped Items",
+    Callback = function(state)
+        autoBring = state
+        UIEngine:Notify({ Title = "joaozin", Content = state and "Auto Bring ON" or "Auto Bring OFF", Duration = 2 })
+        if state then
+            task.spawn(function()
+                while autoBring do
+                    pcall(BringToolsAction)
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+local barrierStates = {}
+local barrierConn
+MiscTab:CreateToggle({
+    Name = "Remove Barrier",
+    Callback = function(state)
+        UIEngine:Notify({ Title = "joaozin", Content = state and "Barrier ON" or "Barrier OFF", Duration = 2 })
+        if barrierConn then barrierConn:Disconnect() barrierConn = nil end
+        local function apply()
+            local ts = Workspace:FindFirstChild("TycoonSets")
+            if not ts then return end
+            for _, d in ipairs(ts:GetDescendants()) do
+                if d:IsA("Model") and d.Name == "Lasers" then
+                    for _, p in ipairs(d:GetDescendants()) do
+                        if p:IsA("BasePart") then
+                            if barrierStates[p] == nil then barrierStates[p] = p.CanTouch end
+                            p.CanTouch = false
+                        end
+                    end
+                end
+            end
+        end
+        if state then
+            apply()
+            barrierConn = RunService.Heartbeat:Connect(function() apply() end)
+        else
+            for p, ct in pairs(barrierStates) do
+                if p and p.Parent then p.CanTouch = ct end
+            end
+            barrierStates = {}
+        end
+    end
+})
+
+-- ── PVP TAB ────────────────────────────────────────────────
+local selUser = ""
+PvpTab:CreateInput({
+    Name = "User",
+    PlaceholderText = "Digite 3+ chars...",
+    Callback = function(text)
+        local q = text:lower()
+        if #q >= 3 then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Name:lower():sub(1, #q) == q
+                    or p.DisplayName:lower():sub(1, #q) == q then
+                    selUser = p.Name
+                    UIEngine:Notify({ Title = "joaozin", Content = "Alvo: " .. p.Name, Duration = 2 })
+                    break
+                end
+            end
+        else
+            selUser = text
+        end
+    end
+})
+
+local autoKillPvp = false
+PvpTab:CreateToggle({
+    Name = "Auto Kill Player",
+    Callback = function(state)
+        autoKillPvp = state
+        UIEngine:Notify({ Title = "joaozin", Content = state and "Auto Kill ON" or "Auto Kill OFF", Duration = 2 })
+        if not state then return end
+        task.spawn(function()
+            while autoKillPvp do
+                local tgt = Players:FindFirstChild(selUser)
+                if not tgt or not tgt.Character then task.wait(1) continue end
+                local th = tgt.Character:FindFirstChildOfClass("Humanoid")
+                local thrp = tgt.Character:FindFirstChild("HumanoidRootPart")
+                if not th or not thrp or th.Health <= 0 then task.wait(1) continue end
+                local mHrp = getHRP()
+                if not mHrp then task.wait(1) continue end
+                local orig = mHrp.CFrame
+                local cam = Workspace.CurrentCamera
+                cam.CameraSubject = th
+                local flt = Instance.new("Part")
+                flt.Size = Vector3.new(6,1,6)
+                flt.Transparency = 1
+                flt.CanCollide = true
+                flt.Anchored = true
+                flt.Parent = Workspace
+                thrp.Size = Vector3.new(4, 90, 4)
+                thrp.Massless = false
+                thrp.CanCollide = false
+                local angs = {0, math.pi/2, math.pi, 3*math.pi/2}
+                local r = 3.5
+                local i = 1
+                local tChar = tgt.Character
+                while autoKillPvp and th and th.Health > 0 and tChar and tChar.Parent do
+                    local cHrp = tChar:FindFirstChild("HumanoidRootPart")
+                    local mHrp2 = getHRP()
+                    local mHum = getHum()
+                    if cHrp and mHrp2 and mHum then
+                        for _, part in ipairs(getChar():GetDescendants()) do
+                            if part:IsA("BasePart") then part.CanCollide = false end
+                        end
+                        local base = cHrp.Position - Vector3.new(0, 40, 0)
+                        local a = angs[i]
+                        local off = Vector3.new(math.cos(a)*r, 0, math.sin(a)*r)
+                        local tp = base + off
+                        mHrp2.CFrame = CFrame.new(tp, Vector3.new(base.X, tp.Y, base.Z))
+                        flt.CFrame = mHrp2.CFrame - Vector3.new(0,3.5,0)
+                        local axe = getHatchet()
+                        if axe then equip(axe); useTool(axe) end
+                        i = i % #angs + 1
+                    end
+                    task.wait(0.15)
+                end
+                local hum = getHum()
+                if hum then cam.CameraSubject = hum end
+                flt:Destroy()
+                local h2 = getHRP()
+                if h2 then h2.CFrame = orig end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+-- ── VISUALS TAB ────────────────────────────────────────────
+local function getEspParent()
+    return CoreGui
+end
+local espCache = { Players = {}, Mobs = {}, Bosses = {}, Ores = {}, Trees = {}, Items = {} }
+local function addESP(cat, obj, adorn, label, color)
+    if not obj or not adorn or espCache[cat][obj] then return end
+    local parent = getEspParent()
+    local esp = Instance.new("Highlight")
+    esp.Adornee = adorn
+    esp.FillColor = color
+    esp.OutlineColor = color
+    esp.FillTransparency = 0.6
+    esp.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    esp.Parent = parent
+    local bb = Instance.new("BillboardGui")
+    bb.Size = UDim2.new(0, 100, 0, 20)
+    bb.AlwaysOnTop = true
+    bb.StudsOffset = Vector3.new(0, 3, 0)
+    bb.Adornee = adorn
+    bb.Parent = parent
+    local txt = Instance.new("TextLabel", bb)
+    txt.Size = UDim2.new(1,0,1,0)
+    txt.Text = label
+    txt.TextColor3 = color
+    txt.TextStrokeTransparency = 0
+    txt.BackgroundTransparency = 1
+    txt.TextScaled = true
+    espCache[cat][obj] = { Highlight = esp, Billboard = bb }
+end
+local function clearESP(cat)
+    for _, c in pairs(espCache[cat]) do
+        if c.Highlight then c.Highlight:Destroy() end
+        if c.Billboard then c.Billboard:Destroy() end
+    end
+    espCache[cat] = {}
+end
+
+local espP = false
+VisualsTab:CreateToggle({
+    Name = "ESP Players",
+    Callback = function(state)
+        espP = state
+        if not state then clearESP("Players") return end
+        task.spawn(function()
+            while espP do
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        addESP("Players", p.Character, p.Character, p.Name, Color3.fromRGB(255,255,255))
+                    end
+                end
+                for ch, c in pairs(espCache.Players) do
+                    if not ch.Parent then
+                        if c.Highlight then c.Highlight:Destroy() end
+                        if c.Billboard then c.Billboard:Destroy() end
+                        espCache.Players[ch] = nil
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+local espM = false
+VisualsTab:CreateToggle({
+    Name = "ESP Mobs",
+    Callback = function(state)
+        espM = state
+        if not state then clearESP("Mobs") return end
+        task.spawn(function()
+            while espM do
+                local h = Workspace:FindFirstChild("MobsHolder")
+                if h then
+                    for _, m in ipairs(h:GetChildren()) do
+                        if m:IsA("Model") and (m:FindFirstChild("HumanoidRootPart") or m:FindFirstChild("Torso")) then
+                            addESP("Mobs", m, m, m.Name, Color3.fromRGB(255,100,100))
+                        end
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+local espB = false
+VisualsTab:CreateToggle({
+    Name = "ESP Bosses",
+    Callback = function(state)
+        espB = state
+        if not state then clearESP("Bosses") return end
+        task.spawn(function()
+            while espB do
+                local h = Workspace:FindFirstChild("BossHolder")
+                if h then
+                    for _, b in ipairs(h:GetChildren()) do
+                        if b:IsA("Model") and (b:FindFirstChild("HumanoidRootPart") or b:FindFirstChild("Torso")) then
+                            addESP("Bosses", b, b, b.Name, Color3.fromRGB(255,0,0))
+                        end
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+local espO = false
+VisualsTab:CreateToggle({
+    Name = "ESP Ores",
+    Callback = function(state)
+        espO = state
+        if not state then clearESP("Ores") return end
+        task.spawn(function()
+            while espO do
+                for _, hit in ipairs(Workspace:GetDescendants()) do
+                    if hit:IsA("BasePart") and hit.Name == "RockHitPart" and hit.Transparency < 1 then
+                        addESP("Ores", hit, hit, "Ore", Color3.fromRGB(150,150,150))
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+local espT = false
+VisualsTab:CreateToggle({
+    Name = "ESP Trees",
+    Callback = function(state)
+        espT = state
+        if not state then clearESP("Trees") return end
+        local names = {
+            ["MtnTree"]=true, ["SnowTree"]=true, ["RiceFieldTree"]=true,
+            ["BETTER TREE"]=true, ["SpruceTree"]=true, ["WisteriaTree"]=true
+        }
+        task.spawn(function()
+            while espT do
+                local map = Workspace:FindFirstChild("Map")
+                if map then
+                    for _, m in ipairs(map:GetDescendants()) do
+                        if m:IsA("Model") and names[m.Name] then
+                            local hp = m:FindFirstChild("WoodHitPart", true)
+                            if hp and hp.Transparency < 1 then
+                                addESP("Trees", m, m, m.Name, Color3.fromRGB(50,255,50))
+                            end
+                        end
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+local espI = false
+VisualsTab:CreateToggle({
+    Name = "ESP Items",
+    Callback = function(state)
+        espI = state
+        if not state then clearESP("Items") return end
+        local names = {
+            ["Wood"]=true, ["Mishirin Ore"]=true, ["Raw Meat"]=true,
+            ["MoneyBag"]=true, ["RawMeatPart"]=true, ["OrePart"]=true,
+            ["BigMoneyBag"]=true, ["Strong Soul"]=true
+        }
+        task.spawn(function()
+            while espI do
+                for _, obj in ipairs(Workspace:GetChildren()) do
+                    if names[obj.Name] then
+                        local adorn = obj:IsA("Tool") and obj:FindFirstChild("Handle") or obj
+                        if adorn and adorn:IsA("BasePart") then
+                            addESP("Items", obj, adorn, obj.Name, Color3.fromRGB(255,255,0))
+                        end
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+local oAmb = Lighting.Ambient
+local oCSB = Lighting.ColorShift_Bottom
+local oCST = Lighting.ColorShift_Top
+VisualsTab:CreateToggle({
+    Name = "Fullbright",
+    Callback = function(state)
+        if state then
+            Lighting.Ambient = Color3.fromRGB(255,255,255)
+            Lighting.ColorShift_Bottom = Color3.fromRGB(255,255,255)
+            Lighting.ColorShift_Top = Color3.fromRGB(255,255,255)
+        else
+            Lighting.Ambient = oAmb
+            Lighting.ColorShift_Bottom = oCSB
+            Lighting.ColorShift_Top = oCST
+        end
+    end
+})
+
+local oFog = Lighting.FogEnd
+local atmosB
+VisualsTab:CreateToggle({
+    Name = "Remove Fog",
+    Callback = function(state)
+        local at = Lighting:FindFirstChildOfClass("Atmosphere")
+        if state then
+            Lighting.FogEnd = 100000
+            if at then atmosB = at:Clone(); at:Destroy() end
+        else
+            Lighting.FogEnd = oFog
+            if atmosB and not Lighting:FindFirstChildOfClass("Atmosphere") then
+                atmosB:Clone().Parent = Lighting
+            end
+        end
+    end
+})
+
+print("[joaozin menu] Carregado. PlaceId:", game.PlaceId)
